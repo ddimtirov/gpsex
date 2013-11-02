@@ -1,0 +1,93 @@
+<project name="gpsex" default="build" basedir="..">
+    <property name="src.dir"        value="${basedir}/src"/>
+    <property name="lib.dir"        value="${basedir}/lib"/>
+    <property name="resource.dir"   value="${basedir}/res"/>
+
+    <property name="target.dir"      value="${basedir}/.target"/>
+    <property name="class.dir"       value="${target.dir}/1.classes"/>
+    <property name="preverified.dir" value="${target.dir}/2.preverified"/>
+    <property name="exploded.dir"    value="${target.dir}/3.exploded"/>
+    <property name="jar.dir"         value="${target.dir}/4.jar"/>
+    <property name="kjx.dir"         value="${target.dir}/5.kjx"/>
+
+    <property environment="env"/>
+    <property file="${basedir}/build/build.properties"/>
+
+    <path id="project.classpath">
+        <pathelement path="${basedir}/lib/midpapi.zip"/>
+        <pathelement path="${basedir}/lib/kddip.jar"/>
+    </path>
+
+    <path id="tools.classpath">
+        <pathelement path="${basedir}/build/"/>
+        <pathelement path="${basedir}/build/StampysoftAntTasks.jar"/>
+    </path>
+    <taskdef name="updatejad" classname="com.stampysoft.ant.j2me.UpdateJARSizeTask" classpathref="tools.classpath"/>
+
+    <target name="compile">
+        <mkdir dir="${class.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${class.dir}" classpathref="project.classpath"
+               debug="off" optimize="on" deprecation="off"/>
+
+        <exec executable="${basedir}/build/preverify.exe" dir="${basedir}">
+            <arg value  ="-cldc"     />
+            <arg value  ="-d"        /> <arg file   ="${preverified.dir}"/>
+            <arg value  ="-classpath"/> <arg pathref="project.classpath"/>
+            <arg file   ="${class.dir}"/>
+        </exec>
+    </target>
+
+    <target name="package" description="Produce binaries" >
+        <mkdir dir="${exploded.dir}"/>
+        <copy todir="${exploded.dir}">
+            <fileset dir="${resource.dir}"/>
+            <fileset dir="${preverified.dir}"/>
+        </copy>
+
+        <mkdir dir="${jar.dir}"/>
+        <manifest file = "${jar.dir}/${ant.project.name}.jad">
+            <attribute name="MIDlet-Jar-URL" value="${ant.project.name}.jar"/>
+            <attribute name="MIDlet-Jar-Size" value="[DUMMY]"/>
+            <attribute name="MIDlet-Vendor" value="D. Dimitrov"/>
+            <attribute name="MIDlet-Version" value="0.0.1"/>
+            <attribute name="MIDlet-1" value="GpsEx, ,GpsEx"/>
+            <attribute name="MIDlet-Name" value="GP traceS"/>
+            <attribute name="MIDlet-Data-Size" value="1000"/>
+<!--            <attribute name="MIDlet-X-Copyright" value="OFF"/>-->
+<!--            <attribute name="MIDlet-X-AllowURL-1" value="http://test2.alsupport.com/baseball/"/>-->
+            <attribute name="MicroEdition-Configuration" value="CLDC-1.0"/>
+            <attribute name="MicroEdition-Profile" value="MIDP-1.0"/>
+        </manifest>
+
+        <jar basedir="${exploded.dir}" jarfile="${jar.dir}/${ant.project.name}.jar" manifest="${jar.dir}/${ant.project.name}.jad"/>
+        <updatejad jad="${jar.dir}/${ant.project.name}.jad"/>
+
+        <mkdir dir="${kjx.dir}"/>
+        <java jar="${basedir}/build/KJXArchiver.jar" fork="true" failonerror="true">
+            <arg value="-c"/>
+            <arg value="${jar.dir}/${ant.project.name}.jad"/>
+            <arg value="${jar.dir}/${ant.project.name}.jar"/>
+            <arg value="${kjx.dir}/${ant.project.name}.nocrc.kjx"/>
+        </java>
+
+        <copy file  ="${kjx.dir}/${ant.project.name}.nocrc.kjx"
+              tofile="${kjx.dir}/${ant.project.name}.kjx"/>
+        <java classname="CRC" fork="true" classpathref="tools.classpath">
+            <arg line="${kjx.dir}/${ant.project.name}.kjx"/>
+        </java>
+    </target>
+
+    <target name="run" description="Run on EzPlus emulator" >
+        <java jar="${ezplus.home}/Tools/Emulator/jbmidp.jar" fork="true" dir="${ezplus.home}/Tools/Emulator">
+            <classpath refid="project.classpath" />
+            <arg value="${kjx.dir}/${ant.project.name}.nocrc.kjx"/>
+        </java>
+    </target>
+
+    <target name="build" depends="compile,package"/>
+
+    <target name="clean" description = "Deletes files created during the build">
+        <delete dir="${target.dir}" failonerror="false" />
+    </target>
+
+</project>
